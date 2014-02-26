@@ -9,11 +9,22 @@ import discuss
 import discuss.rpc
 import discuss.constants
 
+ACL_ALL = 'acdorsw'
+ACL_READ = 'rs'
+ACL_WRITE = 'aorsw'
+
 def validate_name(name):
     validator = '^[a-zA-Z0-9._-]+$'
     basic_chars = bool(re.match(validator, name))
     parent = bool(re.search('[.][.]', name))
     return basic_chars and not parent
+
+def fill_defaults(args):
+    if not args.longname:
+        args.longname = args.name
+    args.name = args.name.lower()
+    if not args.path:
+        args.path = "/var/spool/discuss/%s" % (args.name, )
 
 def parse_args(full=True):
     """Parse arguments to this script.
@@ -45,12 +56,17 @@ def parse_args(full=True):
     # automatically, validating name also validates the derived path.
     if not validate_name(args.name):
         parser.error("Illegal meeting name")
-    if not args.longname:
-        args.longname = args.name
-    args.name = args.name.lower()
-    if not args.path:
-        args.path = "/var/spool/discuss/%s" % (args.name, )
+    fill_defaults(args)
     return args
+
+class MakeMeetingArgs(object):
+    def __init__(self, shortname, public, longname=None, ):
+        self.public = public
+        self.server = None
+        self.path = None
+        self.longname = longname
+        self.name = shortname
+        fill_defaults(self)
 
 def make_mailfeed(args):
     line_tmpl = '%(name)s-mtg: "|/usr/bin/dsmail -d -s 20 %(path)s"\n'
@@ -71,8 +87,14 @@ def make_meeting(args):
     else:
         make_mailfeed(args)
         print "Success!"
+        return discuss.Meeting(cl, args.path)
+
+def set_default_perms(meeting):
+    meeting.ensure_access('daemon/diswww.mit.edu@ATHENA.MIT.EDU', ACL_READ)
+    meeting.ensure_access('daemon@ATHENA.MIT.EDU', ACL_WRITE)
+    meeting.ensure_access('discuss@ATHENA.MIT.EDU', ACL_WRITE)
 
 if __name__ == '__main__':
-    full = sys.argv[0].endswith('/make-meeting')
+    full = sys.argv[0].endswith('/make_meeting')
     args = parse_args(full)
     make_meeting(args)
