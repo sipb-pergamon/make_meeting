@@ -1,16 +1,28 @@
 #!/usr/bin/python
 
+import functools
 import sys
 import os
+
+import afs
 
 import make_meeting
 
 remote = os.environ['REMOTE_USER']
 
-commands = {
-    'make-public-meeting': lambda *args: make_meeting_remctl(True, *args),
-    'make-private-meeting': lambda *args: make_meeting_remctl(False, *args),
-}
+def chair_with_meeting(f):
+    """Decorator: given a function that takes a meeting, converts it into a function that takes a meeting name and ensures the caller has 'c' (chair) bits on the meeting.
+
+    Note that actual discuss appears to require 'r' or 's' to select a meeting, which we do not do."""
+    @functools.wraps(f)
+    def wrapper(name, *args, **kwargs):
+        meeting = make_meeting.get_local_meeting(name)
+        ace = meeting.get_access(remote)
+        if 'c' in ace:
+            return f(meeting, *args, **kwargs)
+        else:
+            raise ValueError("%s is not a chair of meeting %s" % (remote, name))
+    return wrapper
 
 def make_meeting_remctl(public, shortname, longname=None):
     args = make_meeting.MakeMeetingArgs(shortname, public=public, longname=longname)
@@ -19,6 +31,58 @@ def make_meeting_remctl(public, shortname, longname=None):
         meeting.set_access(remote, make_meeting.ACL_ALL)
         make_meeting.set_default_perms(meeting)
         print meeting.get_acl()
+
+def afs_ptentry_to_krb(ptentry):
+    if '@' in ptentry.name:
+        return ptentry.name
+    else:
+        return ptentry.name + '@ATHENA.MIT.EDU'
+
+@chair_with_meeting
+def set_read_acl(meeting, listname):
+    """Set the people with read on meeting to the members of listname
+
+    - those on whitelist_access (diswww, daemon, etc.) are ignored
+    - people with r xor s will not necessarily be removed
+    - we will remove rs even from chairs, which may prevent them from managing the meeting with the normal discuss client. This function can be used to restore access.
+    """
+    pts = afs.pts.PTS(sec=afs.pts.PTS_ENCRYPT, cell='athena.mit.edu', )
+    afs_members = pts.getEntry("system:%s" % (listname, )).members
+
+    current_acl = meeting.get_acl()
+    current_read = [ace[0] for ace in current_acl if 'rs' in ace[1]]
+
+    missing_read = set(afs_ptentry_to_krb(pt) for pt in afs_members)
+    keep = []
+    remove = []
+    add = []
+    ignore = []
+    for member in current_read:
+        if member in missing_read:
+            missing_read.remove(member)
+            keep.append(member)
+        else:
+            if member in make_meeting.whitelist_access:
+                ignore.append(member)
+            else:
+                meeting.remove_access(member, 'rs')
+                remove.append(member)
+    for member in missing_read:
+        meeting.ensure_access(member, 'rs')
+        add.append(member)
+    results = dict(
+        keep=keep,
+        remove=remove,
+        add=add,
+        ignore=ignore,
+    )
+    print results
+
+commands = {
+    'make-public-meeting': lambda *args: make_meeting_remctl(True, *args),
+    'make-private-meeting': lambda *args: make_meeting_remctl(False, *args),
+    'set-read-acl': set_read_acl,
+}
 
 if __name__ == '__main__':
     command = sys.argv[1]

@@ -19,12 +19,15 @@ def validate_name(name):
     parent = bool(re.search('[.][.]', name))
     return basic_chars and not parent
 
+def meeting_path(name):
+    return "/var/spool/discuss/%s" % (name, )
+
 def fill_defaults(args):
     if not args.longname:
         args.longname = args.name
     args.name = args.name.lower()
     if not args.path:
-        args.path = "/var/spool/discuss/%s" % (args.name, )
+        args.path = meeting_path(args.name)
 
 def parse_args(full=True):
     """Parse arguments to this script.
@@ -92,6 +95,18 @@ def make_meeting(args):
         make_mailfeed(args)
         print "Success!"
         return discuss.Meeting(cl, args.path)
+
+def get_local_meeting(shortname):
+    rpc = discuss.rpc.RPCLocalClient
+    cl = discuss.Client('localhost', RPCClient=rpc)
+    return discuss.Meeting(cl, meeting_path(shortname))
+
+whitelist_access = [
+    'daemon.diswww@ATHENA.MIT.EDU', # web access
+    'daemon@ATHENA.MIT.EDU',        # mail feed
+    'discuss@ATHENA.MIT.EDU',       # admin / alternative mail feed
+    'pergamon-dsadmin@ATHENA.MIT.EDU',  # admin (remctls, for example
+]
 
 def set_default_perms(meeting):
     meeting.ensure_access('daemon.diswww@ATHENA.MIT.EDU', ACL_READ)
