@@ -97,6 +97,7 @@ def set_default_perms(meeting):
     meeting.ensure_access('daemon.diswww@ATHENA.MIT.EDU', ACL_READ)
     meeting.ensure_access('daemon@ATHENA.MIT.EDU', ACL_WRITE)
     meeting.ensure_access('discuss@ATHENA.MIT.EDU', ACL_WRITE)
+    meeting.ensure_access('pergamon-dsadmin@ATHENA.MIT.EDU', ACL_ALL)
 
 if __name__ == '__main__':
     full = sys.argv[0].endswith('/make_meeting')
