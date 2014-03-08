@@ -60,16 +60,20 @@ def parse_args(full=True):
     return args
 
 class MakeMeetingArgs(object):
-    def __init__(self, shortname, public, longname=None, ):
+    def __init__(self, shortname, public, longname=None, validate=True, ):
         self.public = public
         self.server = None
         self.path = None
         self.longname = longname
         self.name = shortname
+        if validate:
+            if not validate_name(shortname):
+                raise ValueError("Illegal meeting name")
         fill_defaults(self)
 
 def make_mailfeed(args):
-    line_tmpl = '%(name)s-mtg: "|/usr/bin/dsmail -d -s 20 %(path)s"\n'
+    # WARNING: assumes that path is safe
+    line_tmpl = '%(name)s-mtg: "|/usr/local/bin/dsmail -d -s 20 %(path)s"\n'
     line = line_tmpl % vars(args)
     with open('/var/spool/discuss/control/aliases', 'a') as aliases:
         aliases.write(line)
