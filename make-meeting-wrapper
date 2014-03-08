@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import functools
+import json
 import sys
 import os
 
@@ -9,6 +10,22 @@ import afs
 import make_meeting
 
 remote = os.environ['REMOTE_USER']
+
+def jsonify_result(f):
+    """Convert a function's result to JSON: catch exceptions and provide a success/failure indication, as well as converting results to JSON."""
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            result = f(*args, **kwargs)
+            d = dict(code="success")
+            if result:
+                d['result'] = result
+        except Exception as e:
+            error = dict(type=type(e).__name__, message=e.message)
+            d = dict(code="error", errors=[error])
+        json.dump(d, fp=sys.stdout)
+        print ""
+    return wrapper
 
 def chair_with_meeting(f):
     """Decorator: given a function that takes a meeting, converts it into a function that takes a meeting name and ensures the caller has 'c' (chair) bits on the meeting.
@@ -24,13 +41,12 @@ def chair_with_meeting(f):
             raise ValueError("%s is not a chair of meeting %s" % (remote, name))
     return wrapper
 
+@jsonify_result
 def make_meeting_remctl(public, shortname, longname=None):
     args = make_meeting.MakeMeetingArgs(shortname, public=public, longname=longname)
     meeting = make_meeting.make_meeting(args)
-    if meeting:
-        meeting.set_access(remote, make_meeting.ACL_ALL)
-        make_meeting.set_default_perms(meeting)
-        print meeting.get_acl()
+    meeting.set_access(remote, make_meeting.ACL_ALL)
+    make_meeting.set_default_perms(meeting)
 
 def afs_ptentry_to_krb(ptentry):
     if '@' in ptentry.name:
@@ -38,6 +54,7 @@ def afs_ptentry_to_krb(ptentry):
     else:
         return ptentry.name + '@ATHENA.MIT.EDU'
 
+@jsonify_result
 @chair_with_meeting
 def set_read_acl(meeting, listname):
     """Set the people with read on meeting to the members of listname
@@ -76,7 +93,7 @@ def set_read_acl(meeting, listname):
         add=add,
         ignore=ignore,
     )
-    print results
+    return results
 
 commands = {
     'make-public-meeting': lambda *args: make_meeting_remctl(True, *args),

@@ -89,12 +89,8 @@ def make_meeting(args):
         rpc = discuss.rpc.RPCLocalClient
     cl = discuss.Client(args.server, RPCClient=rpc)
     error = cl.create_mtg(args.path, args.longname, args.public)
-    if error:
-        print error, discuss.constants.errors.get(error, "unknown code")
-    else:
-        make_mailfeed(args)
-        print "Success!"
-        return discuss.Meeting(cl, args.path)
+    make_mailfeed(args)
+    return discuss.Meeting(cl, args.path)
 
 def get_local_meeting(shortname):
     rpc = discuss.rpc.RPCLocalClient
