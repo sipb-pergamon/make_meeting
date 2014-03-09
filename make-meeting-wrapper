@@ -21,7 +21,11 @@ def jsonify_result(f):
             if result:
                 d['result'] = result
         except Exception as e:
-            error = dict(type=type(e).__name__, message=e.message)
+            message = e.message
+            if not message:
+                message = getattr(e, 'strerror', "")
+            print e.args
+            error = dict(type=type(e).__name__, message=message)
             d = dict(code="error", errors=[error])
         json.dump(d, fp=sys.stdout)
         print ""
