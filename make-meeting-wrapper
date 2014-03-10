@@ -2,6 +2,8 @@
 
 import functools
 import json
+import logging
+from logging.handlers import SysLogHandler
 import sys
 import os
 
@@ -10,6 +12,14 @@ import afs
 import make_meeting
 
 remote = os.environ['REMOTE_USER']
+
+def configure_logging():
+    logger = logging.getLogger('remctl.make-meeting')
+    syslogger = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL3)
+    logger.addHandler(syslogger)
+    return logger
+
+logger = configure_logging()
 
 def jsonify_result(f):
     """Convert a function's result to JSON: catch exceptions and provide a success/failure indication, as well as converting results to JSON."""
@@ -21,11 +31,13 @@ def jsonify_result(f):
             if result:
                 d['result'] = result
         except Exception as e:
+            logger.exception("Caught exception in jsonify_result")
             message = e.message
             if not message:
                 message = getattr(e, 'strerror', "")
-            print e.args
             error = dict(type=type(e).__name__, message=message)
+            if e.args:
+                error['args'] = e.args
             d = dict(code="error", errors=[error])
         json.dump(d, fp=sys.stdout)
         print ""
