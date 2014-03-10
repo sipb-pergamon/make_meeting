@@ -4,12 +4,21 @@ import functools
 import json
 import logging
 from logging.handlers import SysLogHandler
+import subprocess
 import sys
+import tempfile
 import os
 
 import afs
 
 import make_meeting
+
+KRB5_KEYTAB = '/etc/krb5.daemon.keytab'
+KRB5_PRINC = 'daemon/pergamon.mit.edu@ATHENA.MIT.EDU'
+
+# Temporary until daemon/pergamon gets a pts ID
+KRB5_KEYTAB = '/home/adehnert/krb5.keytab'
+KRB5_PRINC = 'daemon/adehnert-test.mit.edu@ATHENA.MIT.EDU'
 
 remote = os.environ['REMOTE_USER']
 
@@ -57,6 +66,21 @@ def chair_with_meeting(f):
             raise ValueError("%s is not a chair of meeting %s" % (remote, name))
     return wrapper
 
+def get_afs_tokens():
+    aklog = ['aklog', 'athena.mit.edu']
+    if 'KRB5CCNAME' in os.environ:
+        logger.warn('Getting AFS tokens with existing tickets')
+        subprocess.check_call(aklog)
+    else:
+        with tempfile.NamedTemporaryFile(mode='rb', prefix='krb5cc_make_meeting_') as fp:
+            logger.warn('Getting AFS tokens with new tickets in KRB5CCNAME=%s', fp.name)
+            env = dict(os.environ)
+            env['KRB5CCNAME'] = fp.name
+            kinit = ['kinit', '-k', '-t', KRB5_KEYTAB, KRB5_PRINC]
+            subprocess.check_call(kinit, env=env)
+            subprocess.check_call('klist', env=env)
+            subprocess.check_call(aklog, env=env)
+
 @jsonify_result
 def make_meeting_remctl(public, shortname, longname=None):
     args = make_meeting.MakeMeetingArgs(shortname, public=public, longname=longname)
@@ -79,6 +103,7 @@ def set_read_acl(meeting, listname):
     - people with r xor s will not necessarily be removed
     - we will remove rs even from chairs, which may prevent them from managing the meeting with the normal discuss client. This function can be used to restore access.
     """
+    get_afs_tokens()
     pts = afs.pts.PTS(sec=afs.pts.PTS_ENCRYPT, cell='athena.mit.edu', )
     afs_members = pts.getEntry("system:%s" % (listname, )).members
 
