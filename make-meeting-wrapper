@@ -78,7 +78,6 @@ def get_afs_tokens():
             env['KRB5CCNAME'] = fp.name
             kinit = ['kinit', '-k', '-t', KRB5_KEYTAB, KRB5_PRINC]
             subprocess.check_call(kinit, env=env)
-            subprocess.check_call('klist', env=env)
             subprocess.check_call(aklog, env=env)
 
 @jsonify_result
