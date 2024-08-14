@@ -17,8 +17,8 @@ KRB5_KEYTAB = '/etc/krb5.daemon.keytab'
 KRB5_PRINC = 'daemon/pergamon.mit.edu@ATHENA.MIT.EDU'
 
 # Temporary until daemon/pergamon gets a pts ID
-KRB5_KEYTAB = '/home/adehnert/krb5.keytab'
-KRB5_PRINC = 'daemon/adehnert-test.mit.edu@ATHENA.MIT.EDU'
+#KRB5_KEYTAB = '/home/adehnert/krb5.keytab'
+#KRB5_PRINC = 'daemon/adehnert-test.mit.edu@ATHENA.MIT.EDU'
 
 remote = os.environ['REMOTE_USER']
 
